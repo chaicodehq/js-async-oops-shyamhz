@@ -89,24 +89,80 @@
  */
 export function prepareOrder(item, prepTime) {
   // Your code here
+  return new Promise((resolve, reject) => {
+    if (!item) {
+      reject(new Error("Item name required!"));
+      return;
+    }
+    if (typeof prepTime !== "number" || prepTime <= 0) {
+      reject(new Error("Invalid prep time!"));
+      return;
+    }
+    setTimeout(() => {
+      resolve({ item, ready: true, prepTime });
+    }, prepTime);
+  });
 }
 
 export function prepareBatch(items) {
   // Your code here
+  if (!items || items.length === 0) {
+    return Promise.resolve([]);
+  }
+  const promises = items.map(i => prepareOrder(i.name, i.prepTime));
+  return Promise.all(promises);
 }
 
 export function getFirstReady(items) {
   // Your code here
+  if (!items || items.length === 0) {
+    return Promise.reject(new Error("No items to prepare!"));
+  }
+  const promises = items.map(i => prepareOrder(i.name, i.prepTime));
+  return Promise.race(promises);
 }
 
 export function prepareSafeBatch(items) {
   // Your code here
+  if (!items || items.length === 0) {
+    return Promise.resolve([]);
+  }
+  const promises = items.map(i => prepareOrder(i.name, i.prepTime));
+  return Promise.allSettled(promises).then(results =>
+    results.map(r =>
+      r.status === "fulfilled"
+        ? r
+        : { status: "rejected", reason: r.reason.message }
+    )
+  );
 }
 
 export function deliverWithTimeout(orderPromise, timeoutMs) {
   // Your code here
+  if (typeof timeoutMs !== "number" || timeoutMs <= 0) {
+    return Promise.reject(new Error("Invalid timeout!"));
+  }
+
+  const timeout = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("Delivery timeout!")), timeoutMs);
+  });
+
+  return Promise.race([orderPromise, timeout]);
 }
 
 export function batchWithRetry(items, maxRetries) {
   // Your code here
+  let attempts = 0;
+
+  const attempt = () => {
+    return prepareBatch(items).catch(err => {
+      if (attempts < maxRetries) {
+        attempts++;
+        return attempt();
+      }
+      throw err;
+    });
+  };
+
+  return attempt();
 }
